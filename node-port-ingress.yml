@@ -1,0 +1,17 @@
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: ssh-bastion-ingressroutetcp
+  namespace: default
+spec:
+  entryPoints:
+    - ssh-neeto-wireframe-staging
+  routes:
+  - match: HostSNI(`*`)
+    kind: Rule
+    services:
+    - name: ssh-bastion-service
+      port: 2222
+  tls:
+    secretName: tls-certificate-secret
