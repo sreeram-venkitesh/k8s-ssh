@@ -1,0 +1,123 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: neetodeploy-console-admin
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: neetodeploy-console-admin-role
+rules:
+- apiGroups: ["", "extensions", "apps", "networking.k8s.io"]
+  resources: ["deployments", "replicasets", "pods", "services", "ingresses", "secrets", "configmaps"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get"]  
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: neetodeploy-console-admin-role-binding
+subjects:
+- kind: ServiceAccount
+  name: neetodeploy-console-admin
+  apiGroup: ""
+roleRef:
+  kind: Role
+  name: neetodeploy-console-admin-role
+  apiGroup: ""
+
+# ---
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: ssh-bastion-service
+#   labels:
+#     app: ssh-bastion-host
+# spec:
+#   type: LoadBalancer
+#   ports:
+#   - port: 2222
+#     targetPort: 2222
+#   selector:
+#     app: ssh-bastion-host
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ssh-bastion-service
+  labels:
+    app: ssh-bastion-host
+spec:
+  type: NodePort
+  ports:
+  - port: 2222 # for internal calls
+    targetPort: 2222 # exposed port of the deployment
+    nodePort: 32222 # nodeport for when accessing with node IP
+  selector:
+    app: ssh-bastion-host
+
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ssh-bastion-host-deployment
+  labels:
+    app: ssh-bastion-host
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ssh-bastion-host
+  template:
+    metadata:
+      labels:
+        app: ssh-bastion-host
+    spec:
+      serviceAccountName: neetodeploy-console-admin
+      containers:
+      - name: ssh-bastion-host-container
+        image: lscr.io/linuxserver/openssh-server:latest
+        ports:
+        - containerPort: 2222
+        resources:
+          requests:
+            cpu: 256m
+            memory: 512Mi
+          limits:
+            cpu: 256m
+            memory: 512Mi
+        env:
+        - name: PUID
+          value: "1000"
+        - name: PGID
+          value: "1000"
+        - name: USER_NAME
+          value: "bastion-host"
+        - name: USER_PASSWORD
+          value: "welcome123!"
+        - name: PASSWORD_ACCESS
+          value: "false"
+        - name: PUBLIC_KEY_FILE
+          value: "/config/.ssh/authorized_keys2"
+        - name: SUDO_ACCESS
+          value: "true"
+        volumeMounts:
+        - name: cli-ssh-public-key-secret 
+          mountPath: "/config/.ssh/authorized_keys2"
+          readOnly: true
+          subPath: authorized_keys
+        - name: console-deployment-ssh-private-key-secret
+          mountPath: "/config/.ssh/id_rsa"
+          readOnly: true
+          subPath: id_rsa
+      volumes:
+      - name: cli-ssh-public-key-secret
+        secret:
+          secretName: cli-ssh-public-key
+      - name: console-deployment-ssh-private-key-secret
+        secret:
+          secretName: console-deployment-ssh-private-key
