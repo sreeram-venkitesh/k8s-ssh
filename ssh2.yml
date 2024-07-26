@@ -1,0 +1,57 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: console-ssh-test
+  labels:
+    app: console-ssh-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: console-ssh-test
+  template:
+    metadata:
+      labels:
+        app: console-ssh-test
+    spec:
+      serviceAccountName: neetodeploy-console-admin
+      containers:
+      - name: console-ssh-test
+        image: lscr.io/linuxserver/openssh-server:latest
+        ports:
+        - containerPort: 2222
+        resources:
+          requests:
+            cpu: 256m
+            memory: 512Mi
+          limits:
+            cpu: 256m
+            memory: 512Mi
+        env:
+        - name: PUID
+          value: "1000"
+        - name: PGID
+          value: "1000"
+        - name: USER_NAME
+          value: "sam"
+        - name: USER_PASSWORD
+          value: "your-password"
+        - name: PASSWORD_ACCESS
+          value: "true"
+        - name: SUDO_ACCESS
+          value: "true"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: console-ssh-test-service
+  labels:
+    app: console-ssh-test-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 2222 # for internal calls
+  selector:
+    app: console-ssh-test
